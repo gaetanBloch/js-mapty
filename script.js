@@ -24,6 +24,8 @@ const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
 const click = function handleMapClick(mapEvent) {
+  form.classList.remove('hidden');
+
   L.marker([mapEvent.latlng.lat, mapEvent.latlng.lng])
     .addTo(this)
     .bindPopup(L.popup({
@@ -51,6 +53,8 @@ const displayMap = (position) => {
 };
 
 const init = () => {
+  form.classList.add('hidden');
+
   const location = navigator.geolocation;
   if (!location) return;
   location.getCurrentPosition(
