@@ -1,3 +1,5 @@
+const { L } = window;
+
 const months = [
   'January',
   'February',
@@ -32,9 +34,17 @@ const init = () => {
   location.getCurrentPosition(
     (position) => {
       const { latitude, longitude } = position.coords;
-      console.log(buildMapUri(latitude, longitude));
+      const coords = [latitude, longitude];
+
+      const map = L.map('map').setView(coords, 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map);
+      L.marker(coords).addTo(map)
+        .bindPopup('A pretty CSS3 popup.<br> Easily customizable.')
+        .openPopup();
     }, (error) => {
-      console.log(error);
+      throw new Error(error.message);
     },
   );
 };
