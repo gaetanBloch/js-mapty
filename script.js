@@ -41,7 +41,14 @@ const init = () => {
       map.on('click', (mapEvent) => {
         L.marker([mapEvent.latlng.lat, mapEvent.latlng.lng])
           .addTo(map)
-          .bindPopup('Workout')
+          .bindPopup(L.popup({
+            maxWidth: 200,
+            minWidth: 100,
+            autoClose: false,
+            closeOnClick: false,
+            className: 'running-popup',
+          })
+            .setContent('Running'))
           .openPopup();
       });
     }, (error) => {
