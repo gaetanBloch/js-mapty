@@ -8,14 +8,19 @@ const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
+const RUNNING = 'running';
+const CYCLING = 'cycling';
+
 // Abstract class
 class Workout {
-  #id = (`${Date.now()}`).slice(-10);
+  id = (`${Date.now()}`).slice(-10);
   date = new Date();
   distance;
   duration;
   coords;
   type;
+  speed;
+  unit;
 
   static MONTHS = [
     'January',
@@ -44,95 +49,116 @@ class Workout {
     this.coords = coords;
   }
 
+  toHTML = () => (
+    `
+    <li class="workout workout--${this.type}" data-id="${this.id}">
+      <h2 class="workout__title">${this.getDescription()}</h2>
+      <div class="workout__details">
+        <span class="workout__icon">🏃‍♂️</span>
+        <span class="workout__value">${this.distance}</span>
+        <span class="workout__unit">km</span>
+      </div>
+      <div class="workout__details">
+        <span class="workout__icon">⏱</span>
+        <span class="workout__value">${this.duration}</span>
+        <span class="workout__unit">min</span>
+      </div>
+      <div class="workout__details">
+        <span class="workout__icon">⚡️</span>
+        <span class="workout__value">${this.speed.toFixed(1)}</span>
+        <span class="workout__unit">${this.unit}</span>
+      </div>
+      <div class="workout__details">
+        ${this.getSpecificHtml()}
+      </div>
+    </li>
+    `
+  );
+
+  toPopUpContent = () => (
+    (this.type === RUNNING ? '🏃‍♂ ' : '🚴‍♀ ') + this.getDescription()
+  );
+
   getDescription = () => (
     `${this.type[0].toUpperCase() + this.type.slice(1)} \
     on ${Workout.MONTHS[this.date.getMonth()]} ${this.date.getDate()}`
   );
+
+  // Method to override
+  getSpecificHtml = () => {
+    throw new Error('You must implement this function');
+  };
 }
 
 class Running extends Workout {
   cadence;
-  pace;
 
   constructor(distance, duration, coords, cadence) {
     super(distance, duration, coords);
     this.cadence = cadence;
-    this.type = 'running';
-    this.pace = this.#getPace();
+    this.type = RUNNING;
+    this.unit = 'min/km';
+    this.speed = this.#calcPace();
   }
 
   // min/km
-  #getPace = () => this.duration / this.distance;
+  #calcPace = () => this.duration / this.distance;
+
+  getSpecificHtml = () => (
+    `
+    <span class="workout__icon">🦶🏼</span>
+    <span class="workout__value">${this.cadence}</span>
+    <span class="workout__unit">spm</span>
+    `
+  );
 }
 
 class Cycling extends Workout {
   elevationGain;
-  speed;
 
   constructor(distance, duration, coords, elevationGain) {
     super(distance, duration, coords);
     this.elevationGain = elevationGain;
-    this.type = 'cycling';
-    this.speed = this.#getSpeed();
+    this.type = CYCLING;
+    this.speed = this.#calcSpeed();
+    this.unit = 'km/h';
   }
 
   // km/h
-  #getSpeed = () => this.distance / (this.duration / 60);
+  #calcSpeed = () => this.distance / (this.duration / 60);
+
+  getSpecificHtml = () => (
+    `
+    <span class="workout__icon">⛰</span>
+    <span class="workout__value">${this.elevationGain}</span>
+    <span class="workout__unit">m</span>
+    `
+  );
 }
 
 class App {
   #map;
   #mapEvent;
-  #workouts = [];
 
   init = () => {
+    this.#getPosition();
+    // Clear workouts list
+    containerWorkouts.querySelectorAll('.workout')
+      .forEach((wo) => wo.remove());
     form.classList.add('hidden');
     inputType.addEventListener('change', this.#typeChanged);
     form.addEventListener('submit', this.#newWorkout);
-    this.#getPosition();
   };
 
-  #toggleHidden = (input) => {
-    input.closest('.form__row')
-      .classList
-      .toggle('form__row--hidden');
-  };
-
-  #typeChanged = () => {
-    this.#toggleHidden(inputCadence);
-    this.#toggleHidden(inputElevation);
-  };
-
-  #newWorkout = (event) => {
-    event.preventDefault();
-
-    form.classList.add('hidden');
-
-    L.marker([this.#mapEvent.latlng.lat, this.#mapEvent.latlng.lng])
-      .addTo(this.#map)
-      .bindPopup(L.popup({
-        maxWidth: 200,
-        minWidth: 100,
-        autoClose: false,
-        closeOnClick: false,
-        className: 'running-popup',
-      }).setContent('Running'))
-      .openPopup();
-  };
-
-  #showForm = (event) => {
-    // Reset input fields
-    inputDistance.value = '';
-    inputDuration.value = '';
-    inputCadence.value = '';
-    inputElevation.value = '';
-    inputType.value = 'running';
-    inputCadence.parentElement.classList.remove('form__row--hidden');
-    inputElevation.parentElement.classList.add('form__row--hidden');
-
-    this.#mapEvent = event;
-    form.classList.remove('hidden');
-    inputDistance.focus();
+  #getPosition = () => {
+    const location = navigator.geolocation;
+    if (!location) return;
+    location.getCurrentPosition(
+      this.#loadMap,
+      (error) => {
+        throw new Error(error.message);
+      },
+    );
   };
 
   #loadMap = (position) => {
@@ -149,15 +175,82 @@ class App {
     this.#map.on('click', this.#showForm);
   };
 
-  #getPosition = () => {
-    const location = navigator.geolocation;
-    if (!location) return;
-    location.getCurrentPosition(
-      this.#loadMap,
-      (error) => {
-        throw new Error(error.message);
-      },
+  // Workout type
+  #typeChanged = () => {
+    this.#toggleHidden(inputCadence);
+    this.#toggleHidden(inputElevation);
+  };
+
+  #toggleHidden = (input) => {
+    input.closest('.form__row')
+      .classList
+      .toggle('form__row--hidden');
+  };
+
+  #showForm = (event) => {
+    this.#mapEvent = event;
+    form.classList.remove('hidden');
+    inputDistance.focus();
+  };
+
+  #newWorkout = (event) => {
+    event.preventDefault();
+
+    // Validate form
+    if ((+inputDistance.value <= 0 || +inputDuration.value <= 0)
+      || (inputType.value === RUNNING && +inputCadence.value <= 0)) {
+      alert('Inputs must be positive numbers');
+      return;
+    }
+
+    form.classList.add('hidden');
+
+    const coords = [this.#mapEvent.latlng.lat, this.#mapEvent.latlng.lng];
+    const workout = this.#createWorkout(coords);
+
+    L.marker(workout.coords)
+      .addTo(this.#map)
+      .bindPopup(L.popup({
+        maxWidth: 200,
+        minWidth: 100,
+        autoClose: false,
+        closeOnClick: false,
+        className: `${workout.type}-popup`,
+      }).setContent(workout.toPopUpContent()))
+      .openPopup();
+
+    containerWorkouts.insertAdjacentHTML('beforeend', workout.toHTML());
+
+    this.#resetForm();
+  };
+
+  #createWorkout = (coords) => {
+    if (inputType.value === RUNNING) {
+      return new Running(
+        +inputDistance.value,
+        +inputDuration.value,
+        coords,
+        +inputCadence.value,
+      );
+    }
+
+    return new Cycling(
+      +inputDistance.value,
+      +inputDuration.value,
+      coords,
+      +inputElevation.value,
     );
+  };
+
+  // Reset input fields
+  #resetForm = () => {
+    inputDistance.value = '';
+    inputDuration.value = '';
+    inputCadence.value = '';
+    inputElevation.value = '';
+    inputType.value = RUNNING;
+    inputCadence.parentElement.classList.remove('form__row--hidden');
+    inputElevation.parentElement.classList.add('form__row--hidden');
   };
 }
 
