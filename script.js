@@ -46,8 +46,28 @@ const displayMap = (position) => {
   map.on('click', handleMapClick);
 };
 
+const toggleHidden = (input) => {
+  input.closest('.form__row')
+    .classList
+    .toggle('form__row--hidden');
+};
+
+const typeChanged = () => {
+  toggleHidden(inputCadence);
+  toggleHidden(inputElevation);
+};
+
 const displayMarker = (event) => {
   event.preventDefault();
+
+  // Reset input fields
+  inputDistance.value = '';
+  inputDuration.value = '';
+  inputCadence.value = '';
+  inputElevation.value = '';
+  inputType.value = 'running';
+  inputCadence.parentElement.classList.remove('form__row--hidden');
+  inputElevation.parentElement.classList.add('form__row--hidden');
 
   form.classList.add('hidden');
 
@@ -66,6 +86,7 @@ const displayMarker = (event) => {
 const init = () => {
   form.classList.add('hidden');
   form.addEventListener('submit', displayMarker);
+  inputType.addEventListener('change', typeChanged);
 
   const location = navigator.geolocation;
   if (!location) return;
