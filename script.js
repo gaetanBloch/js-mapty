@@ -138,20 +138,26 @@ class Cycling extends Workout {
 
 class App {
   #MAP_ZOOM = 13;
+  #MAPTY_WORKOUTS = 'mapty_workouts';
 
   #map;
   #mapEvent;
   #workouts = [];
 
   init = () => {
-    // Display map
-    this.#getPosition();
-
     // Clear workouts list
     containerWorkouts.querySelectorAll('.workout')
       .forEach((wo) => wo.remove());
     form.classList.add('hidden');
 
+    // Get the workouts in the localStorage
+    this.#workouts = this.#deserializeWorkouts();
+    this.#workouts.forEach(this.#renderWorkout);
+
+    // Display map
+    this.#getPosition();
+
+    // Event listeners
     inputType.addEventListener('change', this.#typeChanged);
     form.addEventListener('submit', this.#newWorkout);
     containerWorkouts.addEventListener('click', this.#moveToMarker);
@@ -180,6 +186,8 @@ class App {
     }).addTo(this.#map);
 
     this.#map.on('click', this.#showForm);
+
+    this.#workouts.forEach(this.#renderMarker);
   };
 
   // Workout type
@@ -213,9 +221,46 @@ class App {
     form.classList.add('hidden');
 
     const coords = [this.#mapEvent.latlng.lat, this.#mapEvent.latlng.lng];
-    const workout = this.#createWorkout(coords);
+    const workout = this.#createWorkout(
+      {
+        type: inputType.value,
+        distance: +inputDistance.value,
+        duration: +inputDuration.value,
+        coords,
+        cadence: +inputCadence.value,
+        elevation: +inputElevation.value,
+      },
+    );
     this.#workouts.push(workout);
+    this.#renderMarker(workout);
+    this.#renderWorkout(workout);
 
+    this.#serializeWorkouts();
+
+    this.#resetForm();
+  };
+
+  #createWorkout = (
+    {
+      type,
+      distance,
+      duration,
+      coords,
+      cadence,
+      elevation,
+    },
+  ) => {
+    if (type === RUNNING) {
+      return new Running(distance, duration, coords, cadence);
+    }
+    return new Cycling(distance, duration, coords, elevation);
+  };
+
+  #renderWorkout = (workout) => {
+    containerWorkouts.insertAdjacentHTML('beforeend', workout.toHTML());
+  };
+
+  #renderMarker = (workout) => {
     L.marker(workout.coords)
       .addTo(this.#map)
       .bindPopup(L.popup({
@@ -226,28 +271,6 @@ class App {
         className: `${workout.type}-popup`,
       }).setContent(workout.toPopUpContent()))
       .openPopup();
-
-    containerWorkouts.insertAdjacentHTML('beforeend', workout.toHTML());
-
-    this.#resetForm();
-  };
-
-  #createWorkout = (coords) => {
-    if (inputType.value === RUNNING) {
-      return new Running(
-        +inputDistance.value,
-        +inputDuration.value,
-        coords,
-        +inputCadence.value,
-      );
-    }
-
-    return new Cycling(
-      +inputDistance.value,
-      +inputDuration.value,
-      coords,
-      +inputElevation.value,
-    );
   };
 
   // Reset input fields
@@ -270,6 +293,19 @@ class App {
       animate: true,
       pan: { duration: 1 },
     });
+  };
+
+  #serializeWorkouts = () => {
+    localStorage.setItem(this.#MAPTY_WORKOUTS, JSON.stringify(this.#workouts));
+  };
+
+  #deserializeWorkouts = () => {
+    const jsonWorkouts = localStorage.getItem(this.#MAPTY_WORKOUTS);
+    if (!jsonWorkouts) return [];
+    return Array.from(
+      JSON.parse(jsonWorkouts),
+      (wo) => this.#createWorkout(wo),
+    );
   };
 }
 
