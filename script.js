@@ -137,17 +137,24 @@ class Cycling extends Workout {
 }
 
 class App {
+  #MAP_ZOOM = 13;
+
   #map;
   #mapEvent;
+  #workouts = [];
 
   init = () => {
+    // Display map
     this.#getPosition();
+
     // Clear workouts list
     containerWorkouts.querySelectorAll('.workout')
       .forEach((wo) => wo.remove());
     form.classList.add('hidden');
+
     inputType.addEventListener('change', this.#typeChanged);
     form.addEventListener('submit', this.#newWorkout);
+    containerWorkouts.addEventListener('click', this.#moveToMarker);
   };
 
   #getPosition = () => {
@@ -166,7 +173,7 @@ class App {
       .setView([
         position.coords.latitude,
         position.coords.longitude,
-      ], 13);
+      ], this.#MAP_ZOOM);
 
     L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -177,11 +184,11 @@ class App {
 
   // Workout type
   #typeChanged = () => {
-    this.#toggleHidden(inputCadence);
-    this.#toggleHidden(inputElevation);
+    this.#toggleHiddenField(inputCadence);
+    this.#toggleHiddenField(inputElevation);
   };
 
-  #toggleHidden = (input) => {
+  #toggleHiddenField = (input) => {
     input.closest('.form__row')
       .classList
       .toggle('form__row--hidden');
@@ -207,6 +214,7 @@ class App {
 
     const coords = [this.#mapEvent.latlng.lat, this.#mapEvent.latlng.lng];
     const workout = this.#createWorkout(coords);
+    this.#workouts.push(workout);
 
     L.marker(workout.coords)
       .addTo(this.#map)
@@ -251,6 +259,17 @@ class App {
     inputType.value = RUNNING;
     inputCadence.parentElement.classList.remove('form__row--hidden');
     inputElevation.parentElement.classList.add('form__row--hidden');
+  };
+
+  #moveToMarker = (event) => {
+    const workoutEl = event.target.closest('.workout');
+    if (!workoutEl) return;
+    const workout = this.#workouts
+      .find((wo) => wo.id === workoutEl.dataset.id);
+    this.#map.setView(workout.coords, this.#MAP_ZOOM, {
+      animate: true,
+      pan: { duration: 1 },
+    });
   };
 }
 
